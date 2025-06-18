@@ -4,13 +4,14 @@ import services.AuthenticationService;
 import database.DBInitializer;
 
 import java.sql.SQLException;
+import java.util.Random;
 import java.util.Scanner;
-import java.util.UUID;
 
 public class MainMenu {
     private final Scanner scanner = new Scanner(System.in);
     private final AuthenticationService authService = new AuthenticationService();
-    public static String Logged_In_username ="";
+    public static String Logged_In_username = "";
+
     public void start() throws SQLException {
         DBInitializer.initializeDatabase();
 
@@ -47,7 +48,6 @@ public class MainMenu {
         Logged_In_username = scanner.nextLine();
         if (Logged_In_username.equalsIgnoreCase("cancel")) return;
 
-        // Check if user exists before anything else
         if (!authService.userExists(Logged_In_username)) {
             System.out.println("\u274C No such user found. Please check the username or register first.");
             return;
@@ -69,7 +69,11 @@ public class MainMenu {
                 if ("admin".equalsIgnoreCase(userType)) {
                     new AdminCLI().showMenu();
                 } else if ("student".equalsIgnoreCase(userType)) {
-                    new StudentCLI(Logged_In_username, 1001).showStudentDashboard();
+                    new StudentCLI(Logged_In_username).showStudentDashboard();
+                } else if ("lecturer".equalsIgnoreCase(userType)) {
+                    new LecturerCLI(Logged_In_username).showMenu();
+                } else {
+                    System.out.println("\u274C Unknown user type.");
                 }
                 return;
             } else {
@@ -86,9 +90,6 @@ public class MainMenu {
         System.out.println("\uD83D\uDCCB Register a new user");
         System.out.println("Type 'cancel' at any time to return to the main menu.\n");
 
-        String userId = generateUserId();
-        System.out.println("Generated User ID (username): " + userId);
-
         System.out.print("First Name: ");
         String firstName = scanner.nextLine();
         if (firstName.equalsIgnoreCase("cancel")) return;
@@ -97,6 +98,17 @@ public class MainMenu {
         String lastName = scanner.nextLine();
         if (lastName.equalsIgnoreCase("cancel")) return;
 
+        String idNumber;
+        while (true) {
+            System.out.print("ID Number (unique national ID): ");
+            idNumber = scanner.nextLine();
+            if (idNumber.equalsIgnoreCase("cancel")) return;
+            if (authService.idNumberExists(idNumber)) {
+                System.out.println("\u274C ID Number already registered. Cannot register duplicate.");
+            } else {
+                break;
+            }
+        }
         System.out.print("Address: ");
         String address = scanner.nextLine();
         if (address.equalsIgnoreCase("cancel")) return;
@@ -128,14 +140,28 @@ public class MainMenu {
             System.out.println("\u274C Invalid date format. Use YYYY-MM-DD. Please try again.");
         }
 
+
+
         String userType;
         while (true) {
-            System.out.print("User Type (admin/student): ");
+            System.out.print("User Type (admin/student/lecturer): ");
             userType = scanner.nextLine().toLowerCase();
             if (userType.equalsIgnoreCase("cancel")) return;
-            if (userType.equals("admin") || userType.equals("student")) break;
-            System.out.println("\u274C Invalid user type. Please enter 'admin' or 'student'.");
+            if ("admin".equals(userType) || "student".equals(userType) || "lecturer".equals(userType)) break;
+            System.out.println("\u274C Invalid user type. Please enter 'admin', 'student' or 'lecturer'.");
         }
+
+        String rawId = generateUserId();
+        String userId;
+        if ("admin".equals(userType)) {
+            userId = "Adm" + rawId;
+        } else if ("student".equals(userType)) {
+            userId = "Stu" + rawId;
+        } else {
+            userId = "Lec" + rawId;
+        }
+
+        System.out.println("Generated User ID (username): " + userId);
 
         String password;
         while (true) {
@@ -152,7 +178,7 @@ public class MainMenu {
         }
 
         boolean success = authService.register(
-                userId, firstName, lastName, address, email,
+                userId, firstName, lastName, idNumber, address, email,
                 phone, dob, userType, password
         );
 
@@ -164,7 +190,9 @@ public class MainMenu {
     }
 
     private String generateUserId() {
-        return UUID.randomUUID().toString().substring(0, 5).toUpperCase();
+        Random random = new Random();
+        int number = 100000000 + random.nextInt(900000000); // 9-digit number
+        return String.valueOf(number);
     }
 
     private boolean isValidEmail(String email) {
